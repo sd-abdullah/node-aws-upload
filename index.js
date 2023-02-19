@@ -2,12 +2,13 @@ require("dotenv").config();
 const express = require("express");
 const multer = require("multer");
 const fs = require('fs');
-
-const { s3Uploadv2, s3Uploadv3 } = require("./s3Service");
+const commonEvents = require('./commonEvents');
+const commonEmitter = commonEvents.commonEmitter;
+const uploadHandler = require('./uploadHandler');
 const uuid = require("uuid").v4;
 const app = express();
 
-
+// set the destination and file name
 const diskStorage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, "uploads");
@@ -18,6 +19,7 @@ const diskStorage = multer.diskStorage({
   },
 });
 
+// set multer filteration
 const fileFilter = (req, file, cb) => {
   if (file.mimetype.split("/")[0] === "image") {  // ["image", "jpeg"]
     cb(null, true);
@@ -26,52 +28,27 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-
+// intiate multer 
 const uploadDisk = multer({ 
   storage: diskStorage, 
   fileFilter,
   limits: { fileSize: 10000, files: 2 }
 });
 
+// Prepare listners
+commonEmitter.on('upload-images', (files) => {
+  uploadHandler.handlerv3(files);
+  // uploadHandler.handlerv2(files);
+});
 
-
-// upload to s3 using aws sdk v2
-/* app.post("/upload", uploadDisk.array('file'), async (req, res) => {
-  //console.log(req.files);
-  const files = req.files.map((file) => {
-    return {
-      name: file.filename,
-      buffer: fs.readFileSync(`uploads/${file.filename}`)
-    }
-  });
-  console.log(files);
-  try {
-    const results = await s3Uploadv2(files);
-    //console.log(results);
-    return res.json({ status: "success" });
-  } catch (err) {
-    console.log(err);
-  }
-}); */
-
-
-// upload to s3 using aws sdk v2
+// upload locally and fire event
 app.post("/upload", uploadDisk.array('file'), async (req, res) => {
-  //console.log(req.files);
-  const files = req.files.map((file) => {
-    return {
-      name: file.filename,
-      buffer: fs.readFileSync(`uploads/${file.filename}`)
-    }
+  const files = await req.files.map((file) => {
+    file.buffer = fs.readFileSync(`uploads/${file.filename}`);
+    return file
   });
-  console.log(files);
-  try {
-    const results = await s3Uploadv3(files);
-    //console.log(results);
-    return res.json({ status: "success" });
-  } catch (err) {
-    console.log(err);
-  }
+  commonEmitter.emit('upload-images', files);
+  return res.json({status:"success"});
 });
 
 

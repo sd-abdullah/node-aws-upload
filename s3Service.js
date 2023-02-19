@@ -7,7 +7,7 @@ exports.s3Uploadv2 = async (files) => {
   const params = files.map((file) => {
     return {
       Bucket: process.env.AWS_BUCKET_NAME,
-      Key: `uploads/${file.name}`,
+      Key: `uploads/${file.filename}`,
       Body: file.buffer,
     };
   });
@@ -22,11 +22,13 @@ exports.s3Uploadv3 = async (files) => {
   const params = files.map((file) => {
     return {
       Bucket: process.env.AWS_BUCKET_NAME,
-      Key: `uploads/${file.name}`,
+      Key: `uploads/${file.filename}`,
       Body: file.buffer,
     };
   });
   return await Promise.all(
-    params.map((param) => s3client.send(new PutObjectCommand(param)))
+    params.map((param) => {
+      s3client.send(new PutObjectCommand(param));
+    })
   );
 };
